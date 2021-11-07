@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">Ball</string>
+    <string name="main_menu">Main Menu</string>
+    <string name="rate">Rate</string>
+    <string name="back">Back</string>
+    <string name="register">Register</string>
+    <string name="accept">Accept</string>
+    <string name="start">Start Game</string>
+    <string name="choose_player">Choose player</string>
+    <string name="enter_name">Enter your name</string>
+    <string name="name_error">Empty string or player already exists</string>
+    <string name="delete">Delete</string>
+</resources>

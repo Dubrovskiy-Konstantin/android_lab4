@@ -1,0 +1,5 @@
+/res/*
+!/res/layout*
+!/res/menu*
+!/res/values*
+/res/values-night
