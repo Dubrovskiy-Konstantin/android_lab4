@@ -2,17 +2,15 @@ package com.example.ball
 
 import java.io.Serializable
 
-class Player(var Name : String, var Rate : Float?, var Games : Int?) : Comparable<Player>, Serializable {
+class Player(var Name : String, var Rate : Float = 0.0f, var Games : Int = 0) : Comparable<Player>, Serializable {
     init {
         Name = Name.replace('_', ' ')
     }
 
     override fun compareTo(other: Player): Int {
         return when {
-            this.Rate == null -> 1
-            other.Rate == null -> -1
-            this.Rate!! > other.Rate!! -> -1
-            this.Rate!! < other.Rate!! -> 1
+            this.Rate > other.Rate -> -1
+            this.Rate < other.Rate -> 1
             else -> 0
         }
     }

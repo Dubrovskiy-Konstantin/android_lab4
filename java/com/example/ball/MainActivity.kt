@@ -1,5 +1,6 @@
 package com.example.ball
 
+import android.content.Context
 import android.content.Intent
 import android.media.MediaPlayer
 import androidx.appcompat.app.AppCompatActivity
@@ -8,9 +9,13 @@ import android.view.*
 import android.view.inputmethod.InputMethodManager
 import android.widget.*
 import androidx.core.view.isVisible
+import android.database.Cursor
+import android.database.sqlite.*
+import android.util.Log
 
 
 class MainActivity : AppCompatActivity() {
+    private val reqestCode = 1
     private lateinit var buttonStart: Button
     private lateinit var buttonRate: Button
     private lateinit var buttonRegister: Button
@@ -26,25 +31,79 @@ class MainActivity : AppCompatActivity() {
     private lateinit var currentPlayer: Player
     private var rateIsClicked : Boolean = false
     private var registerIsClicked : Boolean = false
-    private val dbHandler = DBHandler()
+    private lateinit var dbHandler : DBHandler
 
-    private class DBHandler(){
-        fun getFromDB(){}
-        fun addToDB(newPlayer: Player){}
-        fun rmFromDB(rmPlayer: Player){}
-        fun updInDB(updPlayer: Player){}
+    private class DBHandler(val baseContext: Context){
+        private val dbName = "ball.db"
+        private val tableName = "Players"
+
+        private fun openDB(): SQLiteDatabase{
+            return baseContext.openOrCreateDatabase(dbName, MODE_PRIVATE, null)
+        }
+
+        private fun makeQuery(sql: String): Boolean{
+            val db = openDB()
+            try{
+                db.execSQL(sql)
+                db.close()
+                return true
+            }
+            catch (e: Exception){Log.d("makeQuery", e.message.toString())}
+            db.close()
+            return false
+        }
+
+        fun addToDB(newPlayer: Player): Boolean{
+            return makeQuery("INSERT INTO $tableName VALUES ('${newPlayer.Name}', ${newPlayer.Rate}, ${newPlayer.Games});")
+        }
+
+        fun rmFromDB(rmPlayer: Player) : Boolean{
+            return makeQuery("DELETE FROM $tableName WHERE (Name = '${rmPlayer.Name}');")
+        }
+
+        fun updInDB(updPlayer: Player): Boolean{
+            return makeQuery("UPDATE $tableName SET Rate = ${updPlayer.Rate}, Games = ${updPlayer.Games} " +
+                    "WHERE Name = '${updPlayer.Name}';")
+        }
+
+        fun createDB(): Boolean{
+            makeQuery("DROP TABLE IF EXISTS $tableName;")
+            makeQuery("CREATE TABLE IF NOT EXISTS $tableName (" +
+                        "Name TEXT NOT NULL PRIMARY KEY, " +
+                        "Rate REAL, " +
+                        "Games INTEGER);")
+            makeQuery("INSERT INTO $tableName VALUES " +
+                        "('Nick', 3700.5, 100), " +
+                        "('John', 232.1, 5), " +
+                        "('Billy', 420.9, 3), " +
+                        "('Ricardo', 419.7, 7);")
+            return true
+        }
+
+        fun getFromDB() : ArrayList<Player>{
+            val db = openDB()
+            val players = ArrayList<Player>()
+            var query: Cursor? = null
+            try{
+                query = db.rawQuery("SELECT * FROM $tableName;", null)
+                while (query.moveToNext())
+                    players.add(Player(query.getString(0), query.getFloat(1), query.getInt(2)))
+            }
+            catch (e: Exception){Log.d("getFromDB", e.message.toString())}
+            query?.close()
+            db.close()
+            return players
+        }
     }
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        try {
-            this.supportActionBar!!.hide()
-        }
-        catch (e: NullPointerException) {
-        }
+//----- Remove action bar -----
+        try { this.supportActionBar!!.hide() }
+        catch (e: NullPointerException) {}
         this.window.setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN)
-
+//----- Views: -----
         setContentView(R.layout.activity_main)
         buttonRegister = findViewById<Button>(R.id.buttonRegister)
         enterName = findViewById<EditText>(R.id.enterName)
@@ -55,60 +114,60 @@ class MainActivity : AppCompatActivity() {
         registerForContextMenu(listView)
         listView.isVisible = false
         choosePlayer = findViewById<Spinner>(R.id.choosePlayer)
+//----- Fields: -----
         defaultNickname = resources.getString(R.string.choose_player)
-
-        _getPlayers()
-
+        dbHandler = DBHandler(baseContext = baseContext)
+//----- Adapters: -----
         var adapter = ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, playersNicknames)
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         choosePlayer.adapter = adapter
-
-        players.forEach { playersRate.add(it.toString()) }
         adapter = ArrayAdapter<String>(this, android.R.layout.simple_expandable_list_item_1, playersRate)
         listView.adapter = adapter
+//----- Data: -----
+        //dbHandler.createDB()
+        _getPlayers()
+    }
 
+    override fun onResume() {
+        super.onResume()
+        //----- Music: -----
         mediaPlayer = MediaPlayer.create(this, R.raw.main_menu)
         mediaPlayer.isLooping = true
         mediaPlayer.start()
     }
 
+    override fun onPause() {
+        mediaPlayer.stop()
+        super.onPause()
+    }
+
     private fun _getPlayers(){
-        val players = ArrayList<Player>()
+        this.players.clear()
         try {
-            dbHandler.getFromDB()
+            players.addAll(dbHandler.getFromDB())
         }
         catch (e : Exception){
             Toast.makeText(applicationContext, e.message, Toast.LENGTH_LONG).show()
         }
-        //-----------------------------------
-        players.add(Player("Nick", 3700.5f, 100))
-        players.add(Player("John", 232.1f, 5))
-        players.add(Player("Billy", 420.9f, 3))
-        players.add(Player("Ricardo", 419.7f, 7))
-        //-----------------------------------
-        players.sort()
-        this.players.clear()
-        this.players.addAll(players)
+        this.players.sort()
         this.playersNicknames.clear()
         this.playersNicknames.add(defaultNickname)
-        this.players.forEach {
-            this.playersNicknames.add(it.Name)
-        }
+        this.players.forEach { playersNicknames.add(it.Name)}
+        this.playersRate.clear()
+        this.players.forEach { playersRate.add(it.toString()) }
 
-        players.clear()
+        var adapter = listView.adapter as ArrayAdapter<*>
+        adapter.notifyDataSetChanged()
+        adapter = choosePlayer.adapter as ArrayAdapter<*>
+        adapter.notifyDataSetChanged()
         return
     }
 
     private fun _addPlayer(name: String){
         val newPlayer = Player(name, 0f, 0)
         dbHandler.addToDB(newPlayer)
-        players.add(newPlayer)
-        playersNicknames.add(newPlayer.Name)
-        playersRate.add(newPlayer.toString())
-        var adapter = listView.adapter as ArrayAdapter<*>
-        adapter.notifyDataSetChanged()
-        adapter = choosePlayer.adapter as ArrayAdapter<*>
-        adapter.notifyDataSetChanged()
+        _getPlayers()
+        choosePlayer.setSelection(playersNicknames.indexOf(newPlayer.Name))
     }
 
     private  fun _deletePlayer(index: Int){
@@ -116,14 +175,15 @@ class MainActivity : AppCompatActivity() {
         name = name.substring(0, name.indexOf('_') - 1)
         var player : Player? = null
         for(it in players) { if(name == it.Name) {player = it; break; }}
-        players.remove(player!!)
-        playersRate.remove(player.toString())
-        playersNicknames.remove(player.Name)
-        var adapter = listView.adapter as ArrayAdapter<*>
-        adapter.notifyDataSetChanged()
-        adapter = choosePlayer.adapter as ArrayAdapter<*>
-        adapter.notifyDataSetChanged()
-        dbHandler.rmFromDB(player)
+        dbHandler.rmFromDB(player!!)
+        _getPlayers()
+        choosePlayer.setSelection(0)
+    }
+
+    private fun _updatePlayer(player: Player){
+        dbHandler.updInDB(player)
+        _getPlayers()
+        choosePlayer.setSelection(playersNicknames.indexOf(player.Name))
     }
 
     fun registerClick(view : View){
@@ -180,11 +240,17 @@ class MainActivity : AppCompatActivity() {
             this.players.forEach { if(it.Name == selectedName) this.currentPlayer = it }
         }
 
-        Toast.makeText(applicationContext, currentPlayer.Name, Toast.LENGTH_SHORT).show()
+        val intent = Intent(this, GameActivity::class.java)
+        intent.putExtra("player", currentPlayer)
+        startActivityForResult(intent, reqestCode)
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if(requestCode == this.reqestCode){
+            this.currentPlayer = data?.extras?.get("player") as Player
+            _updatePlayer(currentPlayer)
+        }
     }
 
     override fun onCreateContextMenu(menu: ContextMenu?, v: View?, menuInfo: ContextMenu.ContextMenuInfo?) {
