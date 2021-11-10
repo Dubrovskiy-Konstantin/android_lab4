@@ -66,6 +66,21 @@ class MainActivity : AppCompatActivity() {
                     "WHERE Name = '${updPlayer.Name}';")
         }
 
+        fun DBExists(): Boolean{
+            val db = openDB()
+            var query: Cursor? = null
+            var isExists = false
+            try{
+                query = db.rawQuery("SELECT name FROM sqlite_master WHERE type='table' AND name='${tableName}';", null)
+                if (query.count > 0)
+                    isExists = true
+            }
+            catch (e: Exception){Log.d("DBExists", e.message.toString())}
+            query?.close()
+            db.close()
+            return isExists
+        }
+
         fun createDB(): Boolean{
             makeQuery("DROP TABLE IF EXISTS $tableName;")
             makeQuery("CREATE TABLE IF NOT EXISTS $tableName (" +
@@ -81,6 +96,8 @@ class MainActivity : AppCompatActivity() {
         }
 
         fun getFromDB() : ArrayList<Player>{
+            if(!DBExists())
+                createDB()
             val db = openDB()
             val players = ArrayList<Player>()
             var query: Cursor? = null

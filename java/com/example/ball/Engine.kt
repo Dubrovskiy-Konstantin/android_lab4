@@ -1,4 +1,4 @@
-package com.example.draw
+package com.example.ball
 
 import android.content.Context
 import android.graphics.Canvas
@@ -11,16 +11,18 @@ import android.hardware.SensorManager
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import androidx.appcompat.app.AppCompatActivity
+import com.example.ball.levels_data.Level
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 import kotlin.math.abs
 import kotlin.math.sign
 
-//class Engine(surfaceView: SurfaceView, val context: Context){
+
 class Engine(surfaceView: SurfaceView, val context: Context, val levels: ArrayList<Level>){
-    private lateinit var sensor : Sensor
-    private lateinit var sensorManager : SensorManager
-    private lateinit var mySensorEventListener : SensorEventListener
+    private var sensor : Sensor
+    private var sensorManager : SensorManager
+    private var mySensorEventListener : SensorEventListener
     var values: FloatArray = FloatArray(3)
 
 
@@ -29,10 +31,9 @@ class Engine(surfaceView: SurfaceView, val context: Context, val levels: ArrayLi
 
 
     private var currentLevel: Int = 0
-    //private var render: Render = Render()
-    private lateinit var callback: SurfaceHolder.Callback
+    var score: Float = 0f
+    private var callback: SurfaceHolder.Callback
     private var surfaceHolder: SurfaceHolder? = null
-    var time = System.nanoTime()
     @Volatile
     private var stopped = false
 
@@ -49,21 +50,14 @@ class Engine(surfaceView: SurfaceView, val context: Context, val levels: ArrayLi
                 }
             } else {
                 if (!levels[currentLevel].isFinished){
-                    val timeElapsed = System.nanoTime() - time
-                    time = System.nanoTime()
                     levels[currentLevel].update(values[1], values[0])
                     levels[currentLevel].draw(canvas)
                 }
                 else{
-                    val paint = Paint()
-                    paint.color = Color.WHITE
-                    paint.style = Paint.Style.STROKE
-                    paint.textSize = 60f
-                    canvas.drawText("YOU WIN!!!!!",(canvas.width/2).toFloat(), (canvas.height/2).toFloat(), paint)
-
+                    onWin(canvas)
+                    score += levels[currentLevel].score
                     if(currentLevel < levels.size - 1){
                         currentLevel++
-                        Thread.sleep(2000)
                     }
                     else{
                         exit()
@@ -74,8 +68,21 @@ class Engine(surfaceView: SurfaceView, val context: Context, val levels: ArrayLi
         }
     }
 
+    fun onWin(canvas: Canvas){
+        val paint = Paint()
+        paint.color = Color.BLACK
+        paint.style = Paint.Style.FILL
+        canvas.drawRect(0f,0f,canvas.width.toFloat(),canvas.height.toFloat(),paint)
+        paint.color = Color.WHITE
+        paint.style = Paint.Style.STROKE
+        paint.textSize = 100f
+        canvas.drawText("YOU WIN!!!!!",(canvas.width*0.3f).toFloat(), (canvas.height/2).toFloat(), paint)
+        //Thread.sleep(2000)
+    }
+
     fun exit(){
-        throw Exception("EXIT")
+        this.stop()
+        (context as GameActivity)._toMainMenu(score)
     }
 
     init {
@@ -129,8 +136,10 @@ class Engine(surfaceView: SurfaceView, val context: Context, val levels: ArrayLi
     }
 
     fun stop() {
-        stopped = true
-        sensorManager.unregisterListener(mySensorEventListener, sensor)
+        try {
+            stopped = true
+            sensorManager.unregisterListener(mySensorEventListener, sensor)
+        }finally{}
     }
 
 }
